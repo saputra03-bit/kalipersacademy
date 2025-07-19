@@ -1,60 +1,60 @@
+// ======== AdminDashboard.jsx ========
 import React, { useEffect, useState } from "react";
-import logo from "../assets/1-removebg-preview.png";
+import { collection, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import * as XLSX from "xlsx";
+import { db } from "../firebase";
+import logo from "../assets/1-removebg-preview.png";
 
 function AdminDashboard() {
-  const [requests, setRequests] = useState(() => {
-    const stored = localStorage.getItem("permintaanBarang");
-    return stored ? JSON.parse(stored) : [];
-  });
+  const [requests, setRequests] = useState([]);
 
   useEffect(() => {
-    localStorage.setItem("permintaanBarang", JSON.stringify(requests));
-  }, [requests]);
+    const unsub = onSnapshot(collection(db, "permintaanBarang"), (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setRequests(data);
+    });
+    return () => unsub();
+  }, []);
 
-  const handleAcc = (id, status) => {
-    const updated = requests.map((item) =>
-      item.id === id ? { ...item, accStatus: status } : item
-    );
-    setRequests(updated);
+  const handleAcc = async (id, status) => {
+    const docRef = doc(db, "requests", id);
+    await updateDoc(docRef, { accStatus: status });
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("userRole");
-    window.location.href = "/";
-  };
-
- const downloadExcel = () => {
-  const offlineData = requests.filter((r) => r.metodePembelian === "offline");
-  const onlineData = requests.filter((r) => r.metodePembelian === "online");
-
-  const formatData = (data) =>
-    data.map((r, i) => ({
-      No: i + 1,
-      Tanggal: r.tanggal,
-      Nama: r.nama,
-      Jabatan: r.jabatan,
-      Barang: r.namaBarang,
-      Jumlah: `${r.jumlah} ${r.satuan}`,
-      Harga: r.harga,
-      Urgensi: r.urgent ? "URGENT" : "Normal",
-      Metode: r.metodePembelian,
-      LinkToko: r.linkToko,
-      EstimasiTiba: r.estimasiTiba,
-      Keterangan: r.keterangan,
-      Status: r.accStatus,
+  const downloadExcel = () => {
+    const data = requests.map((r, index) => ({
+      "No": index + 1,
+      "Tanggal": r.tanggal,
+      "Nama": r.nama,
+      "Jabatan": r.jabatan,
+      "Nama Barang": r.namaBarang,
+      "Jumlah": `${r.jumlah} ${r.satuan}`,
+      "Harga": r.harga,
+      "Urgent": r.urgent ? "URGENT" : "Normal",
+      "Metode": r.metodePembelian,
+      "Link Toko": r.linkToko || "-",
+      "Estimasi Tiba": r.estimasiTiba || "-",
+      "Status": r.accStatus || "-",
     }));
 
-  const createFile = (data, fileName) => {
-    const ws = XLSX.utils.json_to_sheet(formatData(data));
+    const sheet = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Rekapan");
-    XLSX.writeFile(wb, fileName);
-  };
+    XLSX.utils.book_append_sheet(wb, sheet, "Permintaan");
 
-  createFile(offlineData, "Rekapan_Offline_Kalipers.xlsx");
-  createFile(onlineData, "Rekapan_Online_Kalipers.xlsx");
-};
+    // Styling: header bold + green
+    const headerRange = XLSX.utils.decode_range(sheet['!ref']);
+    for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
+      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+      if (!sheet[cellAddress]) continue;
+      sheet[cellAddress].s = {
+        font: { bold: true },
+        fill: { fgColor: { rgb: "D9F99D" } },
+        alignment: { horizontal: "center" },
+      };
+    }
+
+    XLSX.writeFile(wb, "Rekapan_Permintaan_Kalipers.xlsx");
+  };
 
   return (
     <div className="min-h-screen bg-green-50 text-gray-800">
@@ -62,21 +62,9 @@ function AdminDashboard() {
         <div className="flex justify-center mb-4">
           <img src={logo} alt="Kalipers Logo" className="h-20" />
         </div>
-
         <div className="flex justify-between items-center mb-4">
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
-          >
-            Logout
-          </button>
-          <h1 className="text-2xl font-bold text-green-700">
-            Dashboard Admin – Permintaan Barang
-          </h1>
-          <button
-            onClick={downloadExcel}
-            className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition"
-          >
+          <h1 className="text-2xl font-bold text-green-700">Dashboard Admin</h1>
+          <button onClick={downloadExcel} className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition">
             Download Excel
           </button>
         </div>
@@ -94,6 +82,8 @@ function AdminDashboard() {
                 <th className="p-2 border">Harga</th>
                 <th className="p-2 border">Urgent</th>
                 <th className="p-2 border">Metode</th>
+                <th className="p-2 border">Link Toko</th>
+                <th className="p-2 border">Estimasi</th>
                 <th className="p-2 border">Status</th>
                 <th className="p-2 border">Aksi</th>
               </tr>
@@ -106,42 +96,22 @@ function AdminDashboard() {
                   <td className="p-2 border">{item.nama}</td>
                   <td className="p-2 border">{item.jabatan}</td>
                   <td className="p-2 border">{item.namaBarang}</td>
-                  <td className="p-2 border">
-                    {item.jumlah} {item.satuan}
-                  </td>
+                  <td className="p-2 border">{item.jumlah} {item.satuan}</td>
                   <td className="p-2 border">Rp {item.harga}</td>
+                  <td className="p-2 border">{item.urgent ? "URGENT" : "Normal"}</td>
+                  <td className="p-2 border capitalize">{item.metodePembelian}</td>
+                  <td className="p-2 border">{item.linkToko || "-"}</td>
+                  <td className="p-2 border">{item.estimasiTiba || "-"}</td>
+                  <td className="p-2 border">{item.accStatus || "-"}</td>
                   <td className="p-2 border">
-                    {item.urgent ? (
-                      <span className="text-red-600 font-bold">URGENT</span>
-                    ) : (
-                      "Normal"
-                    )}
-                  </td>
-                  <td className="p-2 border capitalize">
-                    {item.metodePembelian}
-                  </td>
-                  <td className="p-2 border">{item.accStatus}</td>
-                  <td className="p-2 border">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleAcc(item.id, "Disetujui")}
-                        className="bg-green-500 text-white px-3 py-1 rounded"
-                      >
-                        ✅
-                      </button>
-                      <button
-                        onClick={() => handleAcc(item.id, "Ditolak")}
-                        className="bg-red-500 text-white px-3 py-1 rounded"
-                      >
-                        ❌
-                      </button>
-                    </div>
+                    <button onClick={() => handleAcc(item.id, "Disetujui")} className="bg-green-500 text-white px-3 py-1 rounded mr-1">✅</button>
+                    <button onClick={() => handleAcc(item.id, "Ditolak")} className="bg-red-500 text-white px-3 py-1 rounded">❌</button>
                   </td>
                 </tr>
               ))}
               {requests.length === 0 && (
                 <tr>
-                  <td colSpan="11" className="text-center text-gray-400 italic p-4">
+                  <td colSpan="13" className="text-center text-gray-400 italic p-4">
                     Belum ada permintaan barang.
                   </td>
                 </tr>
@@ -149,10 +119,6 @@ function AdminDashboard() {
             </tbody>
           </table>
         </div>
-
-        <p className="text-center text-sm text-gray-500 mt-6">
-          &copy; 2025 Kalipers Academy — Dibuat oleh <b>Risky Saputra</b>
-        </p>
       </div>
     </div>
   );

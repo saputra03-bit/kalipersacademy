@@ -1,21 +1,59 @@
-// src/routes.jsx
 import React from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
-import Formulir from "./pages/Formulir";
+import FormulirKaryawan from "./pages/FormulirKaryawan";
 import AdminDashboard from "./pages/AdminDashboard";
+import KaryawanDashboard from "./pages/KaryawanDashboard";
 
-const RoutesComponent = () => {
-  const userRole = localStorage.getItem("role");
+const getRole = () => localStorage.getItem("role");
+const isLoggedIn = () => !!localStorage.getItem("token");
 
+function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/" element={<Login />} />
-      {userRole === "admin" && <Route path="/admin" element={<AdminDashboard />} />}
-      {userRole === "karyawan" && <Route path="/formulir" element={<Formulir />} />}
-      <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
-  );
-};
+    <Router>
+      <Routes>
+        {/* Login Page */}
+        <Route path="/" element={<Login />} />
 
-export default RoutesComponent;
+        {/* Karyawan Pages */}
+        <Route
+          path="/karyawan/formulir"
+          element={
+            isLoggedIn() && getRole() === "karyawan" ? (
+              <FormulirKaryawan />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/karyawan/dashboard"
+          element={
+            isLoggedIn() && getRole() === "karyawan" ? (
+              <KaryawanDashboard />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+
+        {/* Admin Pages */}
+        <Route
+          path="/admin/dashboard"
+          element={
+            isLoggedIn() && getRole() === "admin" ? (
+              <AdminDashboard />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default AppRoutes;

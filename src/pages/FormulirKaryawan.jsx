@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
+import { db } from "../firebase";
+import { collection, addDoc, Timestamp } from "firebase/firestore";
 import logo from "../assets/1-removebg-preview.png";
 
 function FormulirKaryawan() {
@@ -7,216 +9,219 @@ function FormulirKaryawan() {
     jabatan: "",
     namaBarang: "",
     jumlah: "",
-    satuan: "pcs",
+    satuan: "",
     harga: "",
     urgent: false,
     metodePembelian: "offline",
     linkToko: "",
     estimasiTiba: "",
+    fotoBarang: "",
     keterangan: "",
-    accStatus: "Menunggu",
   });
 
-  const [preview, setPreview] = useState(null);
-
-  useEffect(() => {
-    const role = localStorage.getItem("userRole");
-    if (role !== "karyawan") window.location.href = "/";
-  }, []);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    const waktu = new Date();
-    const tanggal = waktu.toLocaleDateString();
-    const jam = waktu.toLocaleTimeString();
-
-    const newData = {
-      ...form,
-      id: Date.now(),
-      tanggal,
-      waktu: `${tanggal} ${jam}`,
-      gambar: preview,
-    };
-
-    const existing = JSON.parse(localStorage.getItem("permintaanBarang")) || [];
-    localStorage.setItem("permintaanBarang", JSON.stringify([...existing, newData]));
-    alert("Permintaan barang berhasil dikirim!");
-    setForm({
-      nama: "",
-      jabatan: "",
-      namaBarang: "",
-      jumlah: "",
-      satuan: "pcs",
-      harga: "",
-      urgent: false,
-      metodePembelian: "offline",
-      linkToko: "",
-      estimasiTiba: "",
-      keterangan: "",
-      accStatus: "Menunggu",
-    });
-    setPreview(null);
-  };
-
-  const handleImage = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+  const handleChange = (e) => {
+    const { name, value, type, checked, files } = e.target;
+    if (type === "checkbox") {
+      setForm({ ...form, [name]: checked });
+    } else if (type === "file") {
       const reader = new FileReader();
-      reader.onloadend = () => setPreview(reader.result);
-      reader.readAsDataURL(file);
+      reader.onloadend = () => {
+        setForm({ ...form, fotoBarang: reader.result });
+      };
+      reader.readAsDataURL(files[0]);
+    } else {
+      setForm({ ...form, [name]: value });
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("userRole");
-    window.location.href = "/";
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await addDoc(collection(db, "permintaanBarang"), {
+        ...form,
+        createdAt: Timestamp.now(),
+        accStatus: "Menunggu",
+        tanggal: new Date().toLocaleDateString(),
+      });
+      alert("Permintaan berhasil dikirim!");
+      setForm({
+        nama: "",
+        jabatan: "",
+        namaBarang: "",
+        jumlah: "",
+        satuan: "",
+        harga: "",
+        urgent: false,
+        metodePembelian: "offline",
+        linkToko: "",
+        estimasiTiba: "",
+        fotoBarang: "",
+        keterangan: "",
+      });
+    } catch (error) {
+      console.error("Gagal mengirim:", error);
+      alert("Terjadi kesalahan saat mengirim permintaan.");
+    }
   };
 
   return (
-    <div className="min-h-screen bg-green-50 py-10 px-4">
-      <div className="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
-        <div className="flex justify-between items-center mb-6">
-          <img src={logo} alt="Logo" className="h-16" />
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
-          >
-            Logout
-          </button>
+    <div className="min-h-screen bg-green-50 text-gray-800 p-6">
+      <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-xl p-6 space-y-4">
+        <div className="flex justify-center">
+          <img src={logo} alt="Kalipers Logo" className="h-20 mb-4" />
         </div>
-        <h2 className="text-2xl font-bold text-green-700 text-center mb-6">
+        <h2 className="text-2xl font-bold text-green-700 text-center">
           Formulir Permintaan Barang
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <input
-              required
               type="text"
-              placeholder="Nama Lengkap"
-              className="border p-2 rounded-lg"
+              name="nama"
+              placeholder="Nama"
               value={form.nama}
-              onChange={(e) => setForm({ ...form, nama: e.target.value })}
+              onChange={handleChange}
+              className="border p-2 rounded-lg"
+              required
             />
             <select
-              required
-              className="border p-2 rounded-lg"
+              name="jabatan"
               value={form.jabatan}
-              onChange={(e) => setForm({ ...form, jabatan: e.target.value })}
+              onChange={handleChange}
+              className="border p-2 rounded-lg"
+              required
             >
               <option value="">Pilih Jabatan</option>
-              <option value="Housekeeping">Housekeeping</option>
-              <option value="Laundry">Laundry</option>
-              <option value="Electric">Electric</option>
-              <option value="Driver">Driver</option>
-              <option value="Medis">Medis</option>
-              <option value="Office Boy/Girl">Office Boy/Girl</option>
-              <option value="Gardener">Gardener</option>
+              <option>Housekeeping</option>
+              <option>Gardener</option>
+              <option>Office Boy/Girl</option>
+              <option>Laundry</option>
+              <option>Electric</option>
+              <option>Driver</option>
+              <option>Medis</option>
             </select>
             <input
-              required
               type="text"
+              name="namaBarang"
               placeholder="Nama Barang"
-              className="border p-2 rounded-lg"
               value={form.namaBarang}
-              onChange={(e) => setForm({ ...form, namaBarang: e.target.value })}
+              onChange={handleChange}
+              className="border p-2 rounded-lg"
+              required
             />
             <input
-              required
               type="number"
+              name="jumlah"
               placeholder="Jumlah"
-              className="border p-2 rounded-lg"
               value={form.jumlah}
-              onChange={(e) => setForm({ ...form, jumlah: e.target.value })}
+              onChange={handleChange}
+              className="border p-2 rounded-lg"
+              required
             />
             <select
-              className="border p-2 rounded-lg"
+              name="satuan"
               value={form.satuan}
-              onChange={(e) => setForm({ ...form, satuan: e.target.value })}
+              onChange={handleChange}
+              className="border p-2 rounded-lg"
+              required
             >
-              <option value="pcs">pcs</option>
-              <option value="lusin">lusin</option>
-              <option value="unit">unit</option>
-              <option value="rim">rim</option>
-              <option value="roll">roll</option>
-              <option value="meter">meter</option>
+              <option value="">Pilih Satuan</option>
+              <option>pcs</option>
+              <option>box</option>
+              <option>liter</option>
+              <option>unit</option>
+              <option>meter</option>
             </select>
             <input
-              required
               type="number"
-              placeholder="Harga (Rp)"
-              className="border p-2 rounded-lg"
+              name="harga"
+              placeholder="Harga"
               value={form.harga}
-              onChange={(e) => setForm({ ...form, harga: e.target.value })}
+              onChange={handleChange}
+              className="border p-2 rounded-lg"
+              required
             />
           </div>
 
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={form.urgent}
-                onChange={(e) => setForm({ ...form, urgent: e.target.checked })}
-              />
-              <span className="text-sm">Urgent</span>
-            </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="urgent"
+              checked={form.urgent}
+              onChange={handleChange}
+            />
+            <label>Permintaan Urgent</label>
+          </div>
 
-            <label className="flex items-center gap-2">
-              <span className="text-sm">Metode Pembelian:</span>
-              <select
-                value={form.metodePembelian}
-                onChange={(e) => setForm({ ...form, metodePembelian: e.target.value })}
-                className="border p-1 rounded"
-              >
-                <option value="offline">Offline</option>
-                <option value="online">Online</option>
-              </select>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="col-span-2">Metode Pembelian:</label>
+            <label>
+              <input
+                type="radio"
+                name="metodePembelian"
+                value="offline"
+                checked={form.metodePembelian === "offline"}
+                onChange={handleChange}
+              />
+              Offline
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="metodePembelian"
+                value="online"
+                checked={form.metodePembelian === "online"}
+                onChange={handleChange}
+              />
+              Online
             </label>
           </div>
 
           {form.metodePembelian === "online" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <input
-                type="text"
+                type="url"
+                name="linkToko"
                 placeholder="Link Toko Online"
-                className="border p-2 rounded-lg"
                 value={form.linkToko}
-                onChange={(e) => setForm({ ...form, linkToko: e.target.value })}
+                onChange={handleChange}
+                className="border p-2 rounded-lg"
               />
               <input
                 type="text"
-                placeholder="Estimasi Tiba (ex: 3 hari)"
-                className="border p-2 rounded-lg"
+                name="estimasiTiba"
+                placeholder="Estimasi Tiba (contoh: 2 hari)"
                 value={form.estimasiTiba}
-                onChange={(e) => setForm({ ...form, estimasiTiba: e.target.value })}
+                onChange={handleChange}
+                className="border p-2 rounded-lg"
               />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleChange}
+                className="border p-2 rounded-lg"
+              />
+              {form.fotoBarang && (
+                <img
+                  src={form.fotoBarang}
+                  alt="Preview"
+                  className="h-24 w-auto mt-2 rounded-lg border"
+                />
+              )}
             </div>
           )}
 
           <textarea
-            placeholder="Keterangan Tambahan"
-            className="border p-2 rounded-lg w-full"
-            rows="3"
+            name="keterangan"
+            placeholder="Keterangan tambahan..."
             value={form.keterangan}
-            onChange={(e) => setForm({ ...form, keterangan: e.target.value })}
+            onChange={handleChange}
+            className="border p-2 rounded-lg w-full"
           />
-
-          <div>
-            <label className="block mb-2 text-sm font-medium text-gray-600">Upload Foto Barang (Opsional)</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImage}
-              className="block w-full text-sm text-gray-700 border rounded-lg"
-            />
-            {preview && (
-              <img src={preview} alt="Preview" className="mt-4 h-32 object-contain rounded" />
-            )}
-          </div>
 
           <button
             type="submit"
-            className="bg-green-600 text-white py-2 px-6 rounded-lg hover:bg-green-700 transition"
+            className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition"
           >
             Kirim Permintaan
           </button>
